@@ -109,8 +109,8 @@ def main():
 
         # Scramble button
         if st.button("Scramble"):
-            goal_state = GOAL
-            current_state = scramble_state(goal_state)
+            current_state = list_to_string([[tiles[(i, j)] for j in range(3)] for i in range(3)])
+            current_state = scramble_state(current_state)
             st.session_state.tiles = update_puzzle(current_state, tiles, puzzle_cols, tile_images)
             st.session_state.scrambled = True
             st.session_state.solving = False
