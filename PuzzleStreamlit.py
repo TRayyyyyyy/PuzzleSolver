@@ -108,7 +108,7 @@ def main():
                 st.session_state.mixed = True
                 st.session_state.solving = False
                 st.session_state.waiting_message = False
-                st.session_state.move_count = 0  # Reset move count
+                st.session_state.move_count = 0 
                 st.experimental_rerun()
 
         with col3:
@@ -144,8 +144,8 @@ def main():
                 action, state = st.session_state.solution_path[st.session_state.solution_step]
                 update_puzzle(state, st.session_state.tiles)
                 st.session_state.solution_step += 1
-                st.session_state.move_count += 1  # Increment move count
-                time.sleep(0.3)  # Adjust solving speed
+                st.session_state.move_count += 1 
+                time.sleep(0.5) 
                 st.experimental_rerun()
             else:
                 st.session_state.solving = False
