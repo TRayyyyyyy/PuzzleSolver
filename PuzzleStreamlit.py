@@ -153,7 +153,7 @@ def main():
 
 def mix_puzzle_state(state):
     current_state = state
-    num_steps = random.randint(20, 30)  # Fewer steps but still sufficiently mixed
+    num_steps = random.randint(10, 30)
     last_action = None
 
     for step in range(num_steps):
