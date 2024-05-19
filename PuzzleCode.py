@@ -82,7 +82,7 @@ class PuzzleApp:
     def __init__(self, root):
         self.root = root
         self.root.title("8-Puzzle Solver")
-        self.root.geometry("600x650")  # Increase the window size
+        self.root.geometry("600x650")
         self.image_loaded = False 
         self.mixed = False  # Flag to track if the puzzle has been mixed
         self.tiles = {}
