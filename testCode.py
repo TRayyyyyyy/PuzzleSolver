@@ -5,6 +5,7 @@ import random
 from simpleai.search import astar, SearchProblem
 import tkinter.messagebox as messagebox
 
+# Class containing methods to solve the puzzle
 class PuzzleSolver(SearchProblem):
     # Action method to get the list of the possible numbers that can be moved into the empty space 
     def actions(self, cur_state):
@@ -177,8 +178,9 @@ class PuzzleApp:
         self.message_label.config(text="Please wait a moment while thinking to solve puzzle...", font=("Helvetica", 12, "italic"))
         self.root.update_idletasks()
 
-        thinking_speed = 6 
+        thinking_speed = 3  # Fixed thinking speed to Fast
 
+        # Run the A* algorithm with simulated thinking speed
         result = astar(PuzzleSolver(current_state))
         self.reset_move_count()
         if not result.path():
@@ -186,12 +188,11 @@ class PuzzleApp:
             return
 
         def animate_solution(steps):
-            self.message_label.config(text="") 
+            self.message_label.config(text="")
             if not steps:
                 print("Puzzle solved in", self.move_count, "moves.")
                 self.move_label.config(text="Puzzle solved!", font=("Helvetica", 14, "bold"))
-                # Reset mix flag after solving
-                self.mixed = False 
+                self.mixed = False  
                 self.mix_button.config(state=tk.NORMAL)
                 self.upload_button.config(state=tk.NORMAL)
                 self.solve_button.config(state=tk.NORMAL)
@@ -200,8 +201,8 @@ class PuzzleApp:
             self.update_puzzle(state)
             self.move_count += 1
             self.move_label.config(text="Moves: " + str(self.move_count))
-
-            delay = 1500 // thinking_speed  
+        
+            delay = 1500 // thinking_speed  # Faster thinking speeds reduce delay
             self.root.after(delay, lambda: animate_solution(steps[1:]))
 
         animate_solution(result.path())
