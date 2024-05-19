@@ -1,15 +1,15 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 import random
 from simpleai.search import astar, SearchProblem
 import time
 
-# Class containing methods to solve the puzzle
 class PuzzleSolver(SearchProblem):
-    # Action method to get the list of the possible numbers that can be moved o the empty space 
     def actions(self, cur_state):
         rows = string_to_list(cur_state)
         row_empty, col_empty = get_location(rows, 'e')
+        if row_empty is None or col_empty is None:
+            raise ValueError("Empty space ('e') not found in the current state")
 
         actions = []
         if row_empty > 0:
@@ -23,22 +23,20 @@ class PuzzleSolver(SearchProblem):
 
         return actions
 
-    # Return the resulting state after moving a piece to the empty space
     def result(self, state, action):
         rows = string_to_list(state)
         row_empty, col_empty = get_location(rows, 'e')
         row_new, col_new = get_location(rows, action)
+        if row_empty is None or col_empty is None or row_new is None or col_new is None:
+            raise ValueError("One or more tiles not found in the current state")
 
-        rows[row_empty][col_empty], rows[row_new][col_new] = \
-                rows[row_new][col_new], rows[row_empty][col_empty]
+        rows[row_empty][col_empty], rows[row_new][col_new] = rows[row_new][col_new], rows[row_empty][col_empty]
 
         return list_to_string(rows)
 
-    # Returns true if a state is the goal state
     def is_goal(self, state):
         return state == GOAL
 
-    # Returns an estimate of the distance from a state to the goal using the Manhattan distance
     def heuristic(self, state):
         rows = string_to_list(state)
 
@@ -52,22 +50,19 @@ class PuzzleSolver(SearchProblem):
 
         return distance
 
-# Convert list to string
 def list_to_string(input_list):
     return '\n'.join([' '.join(x) for x in input_list])
 
-# Convert string to list
 def string_to_list(input_string):
     return [x.split() for x in input_string.split('\n')]
 
-# Find the 2D location of the input element 
 def get_location(rows, input_element):
     for i, row in enumerate(rows):
         for j, item in enumerate(row):
             if item == input_element:
-                return i, j  
+                return i, j
+    return None, None
 
-# Final result that we want to achieve
 GOAL = '''1 2 3
 4 5 6
 7 8 e'''
@@ -77,93 +72,154 @@ rows_goal = string_to_list(GOAL)
 for number in '12345678e':
     goal_positions[number] = get_location(rows_goal, number)
 
+empty_piece = Image.new('RGB', (133, 133), color='white')
+
 def main():
     st.title("8-Puzzle Solver")
 
-    # Load image
+    st.markdown(
+        """
+        <style>
+        .button {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 50px;
+            font-size: 24px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
     if uploaded_file is not None:
         img = Image.open(uploaded_file)
-        img = img.resize((400, 400))  # Resize the image to fit the canvas
+        img = img.resize((400, 400))
         pieces = [img.crop((j * 133, i * 133, (j + 1) * 133, (i + 1) * 133)) for i in range(3) for j in range(3)]
-        pieces[-1] = Image.new('RGB', (133, 133), color='white')  # The last piece is empty
-        tile_images = {}
-        for i, piece in enumerate(pieces):
-            tile_images[str(i + 1) if i < 8 else 'e'] = piece
+        tile_images = pieces.copy()
 
-        # Initialize session state for tiles and scramble flag
         if 'tiles' not in st.session_state:
             st.session_state.tiles = { (i, j): str(i * 3 + j + 1) if i * 3 + j < 8 else 'e' for i in range(3) for j in range(3) }
-        if 'scrambled' not in st.session_state:
-            st.session_state.scrambled = False
+        if 'mixed' not in st.session_state:
+            st.session_state.mixed = False
         if 'solving' not in st.session_state:
             st.session_state.solving = False
+        if 'waiting_message' not in st.session_state:
+            st.session_state.waiting_message = False
+        if 'initial_state' not in st.session_state:
+            st.session_state.initial_state = None
+        if 'mixed_state' not in st.session_state:
+            st.session_state.mixed_state = None
 
-        # Display puzzle
-        st.header("Puzzle")
-        puzzle_cols = st.columns(3)
-        tiles = st.session_state.tiles
-        for i in range(3):
-            for j in range(3):
-                puzzle_cols[j].image(tile_images[tiles[(i, j)]], use_column_width=True)
+        display_image_frame(st.session_state.tiles, tile_images)
 
-        # Scramble button
-        if st.button("Scramble"):
-            current_state = list_to_string([[tiles[(i, j)] for j in range(3)] for i in range(3)])
-            current_state = scramble_state(current_state)
-            st.session_state.tiles = update_puzzle(current_state, tiles, puzzle_cols, tile_images)
-            st.session_state.scrambled = True
-            st.session_state.solving = False
+        col1, col2, col3 = st.columns([1.5, 2, 1.5])
+        current_state = None  # Initialize current_state
 
-        # Solve button
-        if st.button("Solve"):
-            current_state = list_to_string([[tiles[(i, j)] for j in range(3)] for i in range(3)])
-            if current_state == GOAL:
-                st.warning("The puzzle is already solved.")
-            elif not st.session_state.scrambled:
-                st.warning("Please scramble the puzzle before solving.")
-            else:
+        with col1:
+            if st.button("Mix puzzle", key="mix_puzzle", use_container_width=True):
+                current_state = list_to_string([[st.session_state.tiles[(i, j)] for j in range(3)] for i in range(3)])
+                st.session_state.initial_state = current_state
+                st.write("Initial state before mixing:", current_state)
+                current_state = mix_puzzle_state(current_state)
+                st.session_state.mixed_state = current_state
+                st.write("State after mixing:", current_state)
+                update_puzzle(current_state, st.session_state.tiles)
+                st.session_state.mixed = True
+                st.session_state.solving = False
+                st.session_state.waiting_message = False
+                st.experimental_rerun()
+
+        with col3:
+            if st.button("Solve", key="solve", use_container_width=True):
+                if not st.session_state.mixed:
+                    st.warning("Please mix the puzzle before solving.")
+                else:
+                    st.session_state.solving = True
+                    st.session_state.waiting_message = True
+                    st.session_state.initial_state = None  # Clear initial state message
+                    st.session_state.mixed_state = None    # Clear mixed state message
+                    st.experimental_rerun()
+
+        if st.session_state.initial_state:
+            st.write("Initial state before mixing:", st.session_state.initial_state)
+        if st.session_state.mixed_state:
+            st.write("State after mixing:", st.session_state.mixed_state)
+
+        col_center = st.columns([1.5, 7, 1.5])
+        with col_center[1]:
+            if st.session_state.waiting_message:
+                st.info("Solving the puzzle, please wait...")
+
+            if st.session_state.solving and st.session_state.waiting_message:
+                current_state = list_to_string([[st.session_state.tiles[(i, j)] for j in range(3)] for i in range(3)])
                 result = astar(PuzzleSolver(current_state))
                 if not result.path():
                     st.error("No solution found.")
+                    st.session_state.solving = False
+                    st.session_state.waiting_message = False
                 else:
-                    st.session_state.solving = True
                     st.session_state.solution_path = result.path()
                     st.session_state.solution_step = 0
+                    st.session_state.waiting_message = False
                     st.experimental_rerun()
+            
+            if st.session_state.solving and not st.session_state.waiting_message:
+                if st.session_state.solution_step < len(st.session_state.solution_path):
+                    action, state = st.session_state.solution_path[st.session_state.solution_step]
+                    update_puzzle(state, st.session_state.tiles)
+                    st.session_state.solution_step += 1
+                    time.sleep(0.5)
+                    st.experimental_rerun()
+                else:
+                    st.session_state.solving = False
+                    st.success("Puzzle solved!")
 
-        # Animate solution steps
-        if st.session_state.solving and st.session_state.solution_step < len(st.session_state.solution_path):
-            action, state = st.session_state.solution_path[st.session_state.solution_step]
-            st.session_state.tiles = update_puzzle(state, st.session_state.tiles, puzzle_cols, tile_images)
-            st.session_state.solution_step += 1
-            time.sleep(0.5)
-            st.experimental_rerun()
-
-def scramble_state(state):
+def mix_puzzle_state(state):
     current_state = state
-    num_steps = random.randint(500, 1000)  # Scramble in 500-1000 steps
-    for _ in range(num_steps):
+    num_steps = random.randint(20, 30)  # Increase the number of mix steps for more complexity
+    for step in range(num_steps):
         possible_actions = PuzzleSolver(current_state).actions(current_state)
+        if not possible_actions:
+            raise ValueError("No possible actions found")
         action = random.choice(possible_actions)
         current_state = PuzzleSolver(current_state).result(current_state, action)
 
-    # Ensure the scrambled state is different from the goal
     if current_state == GOAL:
-        for _ in range(100):
-            possible_actions = PuzzleSolver(current_state).actions(current_state)
-            action = random.choice(possible_actions)
-            current_state = PuzzleSolver(current_state).result(current_state, action)
+        possible_actions = PuzzleSolver(current_state).actions(current_state)
+        if not possible_actions:
+            raise ValueError("No possible actions found")
+        action = random.choice(possible_actions)
+        current_state = PuzzleSolver(current_state).result(current_state, action)
 
     return current_state
 
-def update_puzzle(state, tiles, puzzle_cols, tile_images):
+def update_puzzle(state, tiles):
     rows = string_to_list(state)
     for i, row in enumerate(rows):
         for j, tile in enumerate(row):
             tiles[(i, j)] = tile
-            puzzle_cols[j].image(tile_images[tile], use_column_width=True)
-    return tiles
+
+def display_image_frame(tiles, tile_images):
+    grid_image = Image.new('RGB', (400, 400), color='white')
+    draw = ImageDraw.Draw(grid_image)
+    
+    for i in range(1, 3):
+        draw.line((i * 133, 0, i * 133, 400), fill='black', width=2)
+        draw.line((0, i * 133, 400, i * 133), fill='black', width=2)
+
+    for i in range(3):
+        for j in range(3):
+            tile_index = tiles[(i, j)]
+            if tile_index != 'e':
+                tile_image = tile_images[int(tile_index) - 1]
+                bordered_tile = Image.new('RGB', (135, 135), 'black')
+                bordered_tile.paste(tile_image, (1, 1))
+                grid_image.paste(bordered_tile, (j * 133, i * 133))
+
+    st.image(grid_image, use_column_width=True)
 
 if __name__ == "__main__":
     main()

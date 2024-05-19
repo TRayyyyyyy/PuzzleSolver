@@ -84,7 +84,7 @@ class PuzzleApp:
         self.root.title("8-Puzzle Solver")
         self.root.geometry("600x650")  # Increase the window size
         self.image_loaded = False 
-        self.scrambled = False  # Flag to track if the puzzle has been scrambled
+        self.mixed = False  # Flag to track if the puzzle has been mixed
         self.tiles = {}
         self.tile_images = {}
         self.create_widgets()
@@ -103,8 +103,8 @@ class PuzzleApp:
         self.canvas = tk.Canvas(self.root, width=400, height=400, borderwidth=2, relief="solid")
         self.canvas.grid(row=1, column=0, rowspan=2, columnspan=3, padx=10, pady=10)
 
-        self.scramble_button = tk.Button(self.root, text="Scramble", command=self.scramble, width=15)
-        self.scramble_button.grid(row=3, column=0, padx=10, pady=10)
+        self.mix_button = tk.Button(self.root, text="Mix puzzle", command=self.mix_puzzle, width=15)
+        self.mix_button.grid(row=3, column=0, padx=10, pady=10)
 
         self.upload_button = tk.Button(self.root, text="Upload", command=self.load_new_image, width=15)
         self.upload_button.grid(row=3, column=1, padx=10, pady=10)
@@ -123,7 +123,7 @@ class PuzzleApp:
                 self.tile_images[str(i + 1) if i < 8 else 'e'] = ImageTk.PhotoImage(piece)
             self.update_puzzle(GOAL)  # Update to initial goal state with one empty tile
             self.image_loaded = True
-            self.scrambled = False  # Reset scramble flag
+            self.mixed = False  # Reset mix flag
 
     def update_puzzle(self, state):
         rows = string_to_list(state)
@@ -138,19 +138,19 @@ class PuzzleApp:
                 self.canvas.create_rectangle(x0, y0, x0 + 133, y0 + 133, outline="black", width=2)
                 self.tiles[(i, j)] = tile
 
-    def scramble(self):
+    def mix_puzzle(self):
         if not self.image_loaded:  # Check if an image has been loaded
-            messagebox.showinfo("Error", "Please upload an image before scrambling.")
+            messagebox.showinfo("Error", "Please upload an image before mixing.")
             return
         self.move_label.config(text="Moves: 0")
 
         goal_state = GOAL
-        current_state = self.scramble_state(goal_state)
-        self.scrambled = True  # Set the flag to True after scrambling
+        current_state = self.mix_state(goal_state)
+        self.mixed = True  # Set the flag to True after mixing
         self.update_puzzle(current_state)
         self.message_label.config(text="")
 
-    def scramble_state(self, state):
+    def mix_state(self, state):
         current_state = state
         for _ in range(100):
             possible_actions = PuzzleSolver().actions(current_state)
@@ -168,11 +168,11 @@ class PuzzleApp:
         if current_state == GOAL:
             messagebox.showinfo("Info", "The puzzle is already solved. Please mix the puzzle before solving.")
             return
-        if not self.scrambled:  # Check if the puzzle has been scrambled
-            messagebox.showinfo("Error", "Please scramble the puzzle before solving.")
+        if not self.mixed:  # Check if the puzzle has been mixed
+            messagebox.showinfo("Error", "Please mix the puzzle before solving.")
             return
         
-        self.scramble_button.config(state=tk.DISABLED)
+        self.mix_button.config(state=tk.DISABLED)
         self.upload_button.config(state=tk.DISABLED)
         self.solve_button.config(state=tk.DISABLED)
 
@@ -190,8 +190,8 @@ class PuzzleApp:
             if not steps:
                 print("Puzzle solved in", self.move_count, "moves.")
                 self.move_label.config(text="Puzzle solved!", font=("Helvetica", 14, "bold"))
-                self.scrambled = False  # Reset scramble flag after solving
-                self.scramble_button.config(state=tk.NORMAL)
+                self.mixed = False  # Reset mix flag after solving
+                self.mix_button.config(state=tk.NORMAL)
                 self.upload_button.config(state=tk.NORMAL)
                 self.solve_button.config(state=tk.NORMAL)
                 return
