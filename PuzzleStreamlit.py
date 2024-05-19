@@ -93,58 +93,60 @@ def main():
         unsafe_allow_html=True,
     )
 
-    if 'tiles' not in st.session_state:
-        st.session_state.tiles = { (i, j): str(i * 3 + j + 1) if i * 3 + j < 8 else 'e' for i in range(3) for j in range(3) }
-    if 'mixed' not in st.session_state:
-        st.session_state.mixed = False
-    if 'solving' not in st.session_state:
-        st.session_state.solving = False
-    if 'waiting_message' not in st.session_state:
-        st.session_state.waiting_message = False
-    if 'moves' not in st.session_state:
-        st.session_state.moves = 0
-    if 'puzzle_solved' not in st.session_state:
-        st.session_state.puzzle_solved = False
-    if 'solution_path' not in st.session_state:
-        st.session_state.solution_path = []
-    if 'solution_step' not in st.session_state:
-        st.session_state.solution_step = 0
-
-    uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"], disabled=st.session_state.get('solving', False))
+    uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
     if uploaded_file is not None:
         img = Image.open(uploaded_file)
         img = img.resize((400, 400))
         pieces = [img.crop((j * 133, i * 133, (j + 1) * 133, (i + 1) * 133)) for i in range(3) for j in range(3)]
         tile_images = pieces.copy()
 
+        if 'tiles' not in st.session_state:
+            st.session_state.tiles = { (i, j): str(i * 3 + j + 1) if i * 3 + j < 8 else 'e' for i in range(3) for j in range(3) }
+        if 'mixed' not in st.session_state:
+            st.session_state.mixed = False
+        if 'solving' not in st.session_state:
+            st.session_state.solving = False
+        if 'waiting_message' not in st.session_state:
+            st.session_state.waiting_message = False
+        if 'initial_state' not in st.session_state:
+            st.session_state.initial_state = None
+        if 'mixed_state' not in st.session_state:
+            st.session_state.mixed_state = None
+
         display_image_frame(st.session_state.tiles, tile_images)
-        display_moves(st.session_state.moves)
 
         col1, col2, col3 = st.columns([1.5, 2, 1.5])
-        current_state = None
+        current_state = None  # Initialize current_state
 
         with col1:
-            if st.button("Mix puzzle", key="mix_puzzle", use_container_width=True, disabled=st.session_state.get('solving', False)):
+            if st.button("Mix puzzle", key="mix_puzzle", use_container_width=True):
                 current_state = list_to_string([[st.session_state.tiles[(i, j)] for j in range(3)] for i in range(3)])
+                st.session_state.initial_state = current_state
+                st.write("Initial state before mixing:", current_state)
                 current_state = mix_puzzle_state(current_state)
+                st.session_state.mixed_state = current_state
+                st.write("State after mixing:", current_state)
                 update_puzzle(current_state, st.session_state.tiles)
                 st.session_state.mixed = True
                 st.session_state.solving = False
                 st.session_state.waiting_message = False
-                st.session_state.moves = 0
-                st.session_state.puzzle_solved = False
                 st.experimental_rerun()
 
         with col3:
-            if st.button("Solve", key="solve", use_container_width=True, disabled=st.session_state.get('solving', False)):
+            if st.button("Solve", key="solve", use_container_width=True):
                 if not st.session_state.mixed:
                     st.warning("Please mix the puzzle before solving.")
                 else:
                     st.session_state.solving = True
                     st.session_state.waiting_message = True
-                    st.session_state.moves = 0
-                    st.session_state.puzzle_solved = False
+                    st.session_state.initial_state = None  # Clear initial state message
+                    st.session_state.mixed_state = None    # Clear mixed state message
                     st.experimental_rerun()
+
+        if st.session_state.initial_state:
+            st.write("Initial state before mixing:", st.session_state.initial_state)
+        if st.session_state.mixed_state:
+            st.write("State after mixing:", st.session_state.mixed_state)
 
         col_center = st.columns([1.5, 7, 1.5])
         with col_center[1]:
@@ -169,26 +171,15 @@ def main():
                     action, state = st.session_state.solution_path[st.session_state.solution_step]
                     update_puzzle(state, st.session_state.tiles)
                     st.session_state.solution_step += 1
-                    st.session_state.moves += 1
                     time.sleep(0.5)
-                    display_moves(st.session_state.moves)
                     st.experimental_rerun()
                 else:
                     st.session_state.solving = False
-                    st.session_state.puzzle_solved = True
-                    st.experimental_rerun()
-            
-            if st.session_state.puzzle_solved:
-                st.success(f"Puzzle Solved in {st.session_state.moves} moves!")
-
-def display_moves(moves):
-    col1, col2, col3 = st.columns([2, 1, 2])
-    with col2:
-        st.write(f"Moves: {moves}")
+                    st.success("Puzzle solved!")
 
 def mix_puzzle_state(state):
     current_state = state
-    num_steps = random.randint(20, 30)
+    num_steps = random.randint(20, 30)  # Increase the number of mix steps for more complexity
     for step in range(num_steps):
         possible_actions = PuzzleSolver(current_state).actions(current_state)
         if not possible_actions:
